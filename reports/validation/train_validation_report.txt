@@ -1,0 +1,374 @@
+
+Validation Report: train
+
+  RelSpeed :
+
+    Description: speed of the ball at release
+
+    Dtype: <class 'float'>
+
+    Unit: mph
+
+    Missing rate: 0.47% (49 pitches)
+
+    RelSpeed passes the missingness threshold
+
+    Inside soft interval: 97.37% (10172 pitches)
+
+    Inside hard but outside soft: 2.16% (226 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  VertRelAngle :
+
+    Description: Signed angle in degrees between the release velocity vector projected onto the YZ plane and the fixed Y-axis at ball release
+
+    Dtype: <class 'float'>
+
+    Unit: deg
+
+    Missing rate: 0.47% (49 pitches)
+
+    VertRelAngle passes the missingness threshold
+
+    Inside soft interval: 99.42% (10386 pitches)
+
+    Inside hard but outside soft: 0.11% (12 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  HorzRelAngle :
+
+    Description: Angle between the ball’s initial projected direction of travel in the horizontal plane and the forward y-direction at release
+
+    Dtype: <class 'float'>
+
+    Unit: deg
+
+    Missing rate: 0.47% (49 pitches)
+
+    HorzRelAngle passes the missingness threshold
+
+    Inside soft interval: 99.00% (10343 pitches)
+
+    Inside hard but outside soft: 0.53% (55 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  SpinRate :
+
+    Description: Angular speed of the pitched ball, measured in revolutions per minute (rpm), treated as an initial release-time pitch characteristic
+
+    Dtype: <class 'float'>
+
+    Unit: rpm
+
+    Missing rate: 0.48% (50 pitches)
+
+    SpinRate passes the missingness threshold
+
+    Inside soft interval: 95.57% (9984 pitches)
+
+    Inside hard but outside soft: 3.95% (413 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  SpinAxis :
+
+    Description: Orientation of the ball’s spin axis in the tracking system’s reference frame, reported in degrees
+
+    Dtype: <class 'float'>
+
+    Unit: deg
+
+    Missing rate: 0.47% (49 pitches)
+
+    SpinAxis passes the missingness threshold
+
+    Outside hard interval: 0.00% (0 pitches)
+
+    Special handling: Soft bounds omitted because SpinAxis is circular, not linear
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  RelHeight :
+
+    Description: Vertical height of the ball at the instant of release, expressed in the tracking system referenced to home plate
+
+    Dtype: <class 'float'>
+
+    Unit: m
+
+    Missing rate: 0.47% (49 pitches)
+
+    RelHeight passes the missingness threshold
+
+    Inside soft interval: 98.11% (10250 pitches)
+
+    Inside hard but outside soft: 1.42% (148 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  RelSide :
+
+    Description: Signed lateral distance of the ball from the tracking system’s y-axis at the instant of release
+
+    Dtype: <class 'float'>
+
+    Unit: m
+
+    Missing rate: 0.47% (49 pitches)
+
+    RelSide passes the missingness threshold
+
+    Inside soft interval: 99.53% (10398 pitches)
+
+    Inside hard but outside soft: 0.00% (0 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  Extension :
+
+    Description: Forward release distance from the pitching rubber toward home plate, measured at the instant of ball release
+
+    Dtype: <class 'float'>
+
+    Unit: ft
+
+    Missing rate: 0.48% (50 pitches)
+
+    Extension passes the missingness threshold
+
+    Inside soft interval: 99.47% (10392 pitches)
+
+    Inside hard but outside soft: 0.05% (5 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  VertBreak :
+
+    Description: Signed vertical displacement at the front-of-home-plate plane between the actual pitch location and the no-gravity straight-line reference from release
+
+    Dtype: <class 'float'>
+
+    Unit: cm
+
+    Missing rate: 0.47% (49 pitches)
+
+    VertBreak passes the missingness threshold
+
+    Inside soft interval: 98.83% (10325 pitches)
+
+    Inside hard but outside soft: 0.70% (73 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  InducedVertBreak :
+
+    Description: Signed vertical difference at the front-of-home-plate plane between the actual pitch trajectory and a gravity-only reference trajectory from the same release state
+
+    Dtype: <class 'float'>
+
+    Unit: cm
+
+    Missing rate: 0.47% (49 pitches)
+
+    InducedVertBreak passes the missingness threshold
+
+    Inside soft interval: 99.53% (10398 pitches)
+
+    Inside hard but outside soft: 0.00% (0 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  HorzBreak :
+
+    Description: Signed horizontal difference at the front-of-home-plate plane between the actual pitch crossing location and the no-gravity reference crossing location from the same release state
+
+    Dtype: <class 'float'>
+
+    Unit: cm
+
+    Missing rate: 0.47% (49 pitches)
+
+    HorzBreak passes the missingness threshold
+
+    Inside soft interval: 98.84% (10326 pitches)
+
+    Inside hard but outside soft: 0.69% (72 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  PlateLocHeight :
+
+    Description: Height of the actual pitch at the front-of-home-plate plane, measured relative to home plate
+
+    Dtype: <class 'float'>
+
+    Unit: ft
+
+    Missing rate: 0.40% (42 pitches)
+
+    PlateLocHeight passes the missingness threshold
+
+    Inside soft interval: 97.60% (10196 pitches)
+
+    Inside hard but outside soft: 0.78% (82 pitches)
+
+    Outside hard interval: 1.22% (127 pitches)
+
+    Special handling: Raw Tukey lower bound was slightly negative, but because PlateLocHeight has a physical lower limit of 0 ft, the operational soft lower bound was clamped to 0
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  PlateLocSide :
+
+    Description: Signed lateral offset at the front-of-home-plate plane from the fixed center line (x = 0) in the field coordinate system
+
+    Dtype: <class 'float'>
+
+    Unit: ft
+
+    Missing rate: 0.47% (49 pitches)
+
+    PlateLocSide passes the missingness threshold
+
+    Inside soft interval: 99.31% (10375 pitches)
+
+    Inside hard but outside soft: 0.22% (23 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  ZoneSpeed :
+
+    Description: Speed of the ball at the instant it crosses the front-of-home-plate plane
+
+    Dtype: <class 'float'>
+
+    Unit: mph
+
+    Missing rate: 0.47% (49 pitches)
+
+    ZoneSpeed passes the missingness threshold
+
+    Inside soft interval: 97.04% (10138 pitches)
+
+    Inside hard but outside soft: 2.49% (260 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  VertApprAngle :
+
+    Description: Angle between the ball’s projected direction of travel in the vertical plane and the forward y-direction at the front-of-home-plate plane
+
+    Dtype: <class 'float'>
+
+    Unit: deg
+
+    Missing rate: 0.47% (49 pitches)
+
+    VertApprAngle passes the missingness threshold
+
+    Inside soft interval: 99.03% (10346 pitches)
+
+    Inside hard but outside soft: 0.50% (52 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  HorzApprAngle :
+
+    Description: Angle between the ball’s projected direction of travel in the horizontal plane and the forward y-direction at the front-of-home-plate plane
+
+    Dtype: <class 'float'>
+
+    Unit: deg
+
+    Missing rate: 0.47% (49 pitches)
+
+    HorzApprAngle passes the missingness threshold
+
+    Inside soft interval: 99.19% (10362 pitches)
+
+    Inside hard but outside soft: 0.34% (36 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+
+
+  ZoneTime :
+
+    Description: Elapsed time from pitch release to the ball crossing the front-of-home-plate plane
+
+    Dtype: <class 'float'>
+
+    Unit: s
+
+    Missing rate: 0.47% (49 pitches)
+
+    ZoneTime passes the missingness threshold
+
+    Inside soft interval: 96.53% (10085 pitches)
+
+    Inside hard but outside soft: 3.00% (313 pitches)
+
+    Outside hard interval: 0.00% (0 pitches)
+
+
+     Category coverage check (missing + soft + middle + outside hard): 10447 / 10447 (1.0000)
+

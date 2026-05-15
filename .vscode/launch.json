@@ -1,0 +1,71 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "01 Run Cleaning",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "softball_xrv.cleaning",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "02 Run Split",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "softball_xrv.split",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "03 Run Validate",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "softball_xrv.validate",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "04 Run EDA",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "softball_xrv.eda",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "05 Run Modeling",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "softball_xrv.modeling",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "06 Run Evaluation",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "softball_xrv.evaluation",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+      },
+      "console": "integratedTerminal"
+    }
+  ]
+}
