@@ -31,7 +31,7 @@ class NNTrainConfig:
     Hyperparameters for one fold-level neural-network training run.
     The config is frozen so each fold receives a stable, immutable set of
     architecture, optimizer, loss, and early-stopping settings.
-    
+
     """
 
     batch_size: int = 128
@@ -308,13 +308,15 @@ def train_nn_one_fold(
     model.eval()
     with torch.no_grad():
         val_logits = model(X_val_tensor)
-        val_proba = torch.softmax(val_logits, dim=1).detach().cpu().numpy()
+        val_proba = torch.softmax(val_logits, dim=1).double().detach().cpu().numpy()
 
     if not np.isfinite(val_proba).all():
         raise ValueError("Validation probabilities contain NaN or inf.")
 
     val_proba = np.clip(val_proba, 1e-15, 1.0)
-    val_proba = val_proba / val_proba.sum(axis=1, keepdims=True)
+    val_proba = val_proba / val_proba.sum(
+        axis=1, keepdims=True
+    )  # renormalize — present
 
     val_pred = val_proba.argmax(axis=1)
 

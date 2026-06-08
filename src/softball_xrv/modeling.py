@@ -1,11 +1,24 @@
 """Run grouped cross-validation model selection on train.csv only."""
 
+import argparse
+import time
+from datetime import datetime
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedGroupKFold
 
-from softball_xrv.config import TRAIN_PATH, REPORTS_DIR, TARGET_COL, GROUP_COL, RANDOM_STATE
-from softball_xrv.feature_sets import FEATURE_SETS, add_modeling_features, validate_modeling_features
+from softball_xrv.config import (
+    TRAIN_PATH,
+    REPORTS_DIR,
+    TARGET_COL,
+    GROUP_COL,
+    RANDOM_STATE,
+)
+from softball_xrv.feature_sets import (
+    FEATURE_SETS,
+    add_modeling_features,
+    validate_modeling_features,
+)
 from softball_xrv.metrics import (
     exact_match_accuracy,
     balanced_accuracy,
@@ -26,7 +39,6 @@ from softball_xrv.tree_models import (
 )
 from softball_xrv.nn_train import NN_EXPERIMENTS, NNTrainConfig, train_nn_one_fold
 
-
 N_SPLITS = 5
 TOP_K = 2
 OUT_DIR = REPORTS_DIR / "model_selection"
@@ -36,6 +48,31 @@ NN_MODEL_KEYS = {
     "PyTorch_SoftLabelCE": "nn_soft_label_ce",
     "PyTorch_HybridCE_SharpSoftCE_Distance": "nn_hybrid_ce_sharp_soft_distance",
 }
+
+START_TIME = time.time()
+
+
+def log(message: str) -> None:
+    elapsed_time = time.time() - START_TIME
+    stamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{stamp} | +{elapsed_time:8.1f}s] {message}", flush=True)
+
+
+def make_row_appender(path):
+    state = {"columns": None}
+
+    def append_save_rows(row: dict) -> None:
+        # 1*15 DataFrame for row1
+        df_row = pd.DataFrame([row])
+        if state["columns"] is None:
+            state["columns"] = list(df_row.columns)
+            df_row.to_csv(path, mode="w", header=True, index=False)
+        else:
+            # row2, row3,...  append adds another 1*15 layer
+            df_row = df_row.reindex(columns=state["columns"])
+            df_row.to_csv(path, mode="a", header=False, index=False)
+
+    return append_save_rows
 
 
 def load_train():
@@ -63,7 +100,6 @@ def load_train():
     return df, class_labels, xrv_class_values
 
 
-
 def score_predictions(y_true, y_pred, y_proba, class_labels, xrv_class_values):
     """Compute the main model-selection metrics for one validation output."""
 
@@ -72,41 +108,33 @@ def score_predictions(y_true, y_pred, y_proba, class_labels, xrv_class_values):
         "exact_accuracy": exact_match_accuracy(y_true, y_pred),
         "balanced_accuracy": balanced_accuracy(y_true, y_pred),
         "log_loss": multiclass_log_loss(y_true, y_proba, class_labels),
-        f"top_{k}_accuracy": top_k_accuracy(y_true, y_proba, k=k, class_labels=class_labels),
+        f"top_{k}_accuracy": top_k_accuracy(
+            y_true, y_proba, k=k, class_labels=class_labels
+        ),
         "class_step_mae": mean_absolute_class_error(y_true, y_pred),
         "expected_xrv_mae": mean_absolute_xrv_error(y_true, y_proba, xrv_class_values),
     }
 
 
-def fit_tree_fold(model_name, train_df, val_df, feature_cols, class_labels):
-    """
-    Fit one tree model on one fold.
-    Tree folds use local contiguous labels so CatBoost/XGBoost remain safe
-    when a train fold does not contain every global class.
-    """
-    X_train, X_val = preprocess_tree_features(
-        train_part_df=train_df,
-        val_part_df=val_df,
-        feature_cols=feature_cols,
-    )
-
-    y_train_global = train_df["target_class"].to_numpy(dtype=np.int64)
-    y_val_global = val_df["target_class"].to_numpy(dtype=np.int64)
-
-    model = get_tree_models()[model_name]
+def tree_one_fold(
+    model_name, X_train, X_Val, y_train_global, y_val_global, class_labels
+):
+    models = get_tree_models()
+    model = models[model_name]
 
     local_classes = np.sort(np.unique(y_train_global)).astype(np.int64)
     global_to_local = {global_id: i for i, global_id in enumerate(local_classes)}
-    y_train_local = np.array([global_to_local[y] for y in y_train_global], dtype=np.int64)
+    y_train_local = np.array(
+        [global_to_local[y] for y in y_train_global], dtype=np.int64
+    )
 
     if model_name == "random_forest":
         model.fit(X_train, y_train_local)
-
     else:
         seen_mask = np.isin(y_val_global, local_classes)
 
         if seen_mask.any():
-            X_val_seen = X_val.loc[seen_mask]
+            X_Val_seen = X_Val.loc[seen_mask]
             y_val_seen_local = np.array(
                 [global_to_local[y] for y in y_val_global[seen_mask]],
                 dtype=np.int64,
@@ -116,50 +144,111 @@ def fit_tree_fold(model_name, train_df, val_df, feature_cols, class_labels):
                 model.fit(
                     X_train,
                     y_train_local,
-                    eval_set=[(X_val_seen, y_val_seen_local)],
+                    eval_set=[(X_Val_seen, y_val_seen_local)],
                     verbose=False,
                 )
             elif model_name == "catboost":
                 model.fit(
                     X_train,
                     y_train_local,
-                    eval_set=(X_val_seen, y_val_seen_local),
+                    eval_set=[(X_Val_seen, y_val_seen_local)],
                     use_best_model=True,
                     early_stopping_rounds=EARLY_STOPPING_ROUNDS,
                     verbose=False,
                 )
             else:
                 raise ValueError(f"Unexpected tree model: {model_name}")
-
         else:
             if model_name == "xgboost":
                 model.set_params(early_stopping_rounds=None)
             model.fit(X_train, y_train_local, verbose=False)
 
-    y_proba_local = np.asarray(model.predict_proba(X_val), dtype=float)
-
-    y_proba = np.zeros((len(X_val), len(class_labels)), dtype=float)
+    y_proba_local = np.asarray(model.predict_proba(X_Val), dtype=float)
+    y_proba = np.zeros((len(X_Val), len(class_labels)), dtype=float)
     y_proba[:, local_classes] = y_proba_local
     y_proba = np.clip(y_proba, 1e-15, 1.0)
     y_proba = y_proba / y_proba.sum(axis=1, keepdims=True)
-
     y_pred = y_proba.argmax(axis=1)
+
     return y_val_global, y_pred, y_proba
 
 
+def parse_args() -> argparse.Namespace:
+
+    parser = argparse.ArgumentParser(
+        "Grouped cross-validation model selection for softball xRV."
+    )
+
+    parser.add_argument(
+        "--families",
+        choices=["tree", "nn", "both"],
+        default="both",
+        help="Which model families to run (default: both).",
+    )
+
+    parser.add_argument(
+        "--tree-models",
+        nargs="+",
+        default=list(TREE_MODEL_DISPLAY_NAMES),
+        choices=list(TREE_MODEL_DISPLAY_NAMES),
+        help="Which tree models to run (default: all).",
+    )
+
+    parser.add_argument(
+        "--nn-experiments",
+        nargs="+",
+        default=list(NN_EXPERIMENTS),
+        choices=list(NN_EXPERIMENTS),
+        help="Which NN experiments to run, by display name (default: all).",
+    )
+
+    parser.add_argument(
+        "--feature-sets",
+        nargs="+",
+        default=list(FEATURE_SETS),
+        choices=list(FEATURE_SETS),
+        help='Which feature sets to run, e.g. "Set A" "Set C" (default: all).',
+    )
+
+    parser.add_argument(
+        "--tag",
+        default=None,
+        help="Optional subfolder under the model_selection output dir, so "
+        "separate runs (e.g. one model at a time) do not overwrite each other.",
+    )
+
+    return parser.parse_args()
+
 
 def main() -> None:
-    """Run model selection and save the main outputs."""
+    args = parse_args()
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = OUT_DIR / args.tag if args.tag else OUT_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    selected_feature_sets = {name: FEATURE_SETS[name] for name in args.feature_sets}
+    run_trees = args.families in ("tree", "both")
+    run_nns = args.families in ("nn", "both")
+    selected_tree_models = args.tree_models if run_trees else []
+    selected_nn_experiments = args.nn_experiments if run_nns else []
+
+    n_tree_fits = len(selected_feature_sets) * N_SPLITS * len(selected_tree_models)
+    n_nn_fits = len(selected_feature_sets) * N_SPLITS * len(selected_nn_experiments)
+    total_fits = n_tree_fits + n_nn_fits
+
+    log(f"Output dir        : {out_dir}")
+    log(f"Features sets     : {list(selected_feature_sets)}")
+    log(f"Tree models       :  {selected_tree_models}")
+    log(f"NN experiments    :  {selected_nn_experiments}")
+    log(f"Planned fits      :   {total_fits} (tree={n_tree_fits}, nn={n_nn_fits})")
 
     df, class_labels, xrv_class_values = load_train()
 
+    log(f"Loaded train.csv  : rows={len(df)} , classes = {len(class_labels)}")
+
     cv = list(
         StratifiedGroupKFold(
-            n_splits=N_SPLITS,
-            shuffle=True,
-            random_state=RANDOM_STATE,
+            n_splits=N_SPLITS, shuffle=True, random_state=RANDOM_STATE
         ).split(
             df,
             y=df["target_class"].to_numpy(),
@@ -170,19 +259,42 @@ def main() -> None:
     nn_config = NNTrainConfig()
     fold_rows = []
     oof_store = {}
+    fit_idx = 0
 
-    # Run every feature set against every tree model and every NN experiment.
-    for feature_set_name, feature_cols in FEATURE_SETS.items():
+    fold_metrics_path = out_dir / "cv_fold_metrics.csv"
+    append_fold_row = make_row_appender(fold_metrics_path)
+
+    # Outer loop fixes the set and the feature coloumns
+    # Inner loop w.r.t fold focues on one element from the cv at a time
+    # Fix (feature_set, fold) and this pair is just againist all the models
+
+    for feature_set_name, feature_cols in selected_feature_sets.items():
         for fold, (train_idx, val_idx) in enumerate(cv, start=1):
-            train_df = df.iloc[train_idx].copy()
-            val_df = df.iloc[val_idx].copy()
+            inner_train_df = df.iloc[train_idx].copy()
+            inner_val_df = df.iloc[val_idx].copy()
 
-            for model_name, display_name in TREE_MODEL_DISPLAY_NAMES.items():
-                y_true, y_pred, y_proba = fit_tree_fold(
-                    model_name=model_name,
-                    train_df=train_df,
-                    val_df=val_df,
+            # Preprocess tree feautres once per (feature set, fold) and reuse
+            # across the tree models, instead of re-imputing per model
+
+            if selected_tree_models:
+                X_inner_train_tree, X_inner_val_tree = preprocess_tree_features(
+                    train_part_df=inner_train_df,
+                    val_part_df=inner_val_df,
                     feature_cols=feature_cols,
+                )
+                y_train_global = inner_train_df["target_class"].to_numpy(dtype=np.int64)
+                y_val_global = inner_val_df["target_class"].to_numpy(dtype=np.int64)
+
+            for model_name in selected_tree_models:
+                display_name = TREE_MODEL_DISPLAY_NAMES[model_name]
+                t0 = time.time()
+
+                y_true, y_pred, y_proba = tree_one_fold(
+                    model_name=model_name,
+                    X_train=X_inner_train_tree,
+                    X_Val=X_inner_val_tree,
+                    y_train_global=y_train_global,
+                    y_val_global=y_val_global,
                     class_labels=class_labels,
                 )
 
@@ -194,38 +306,45 @@ def main() -> None:
                     xrv_class_values=xrv_class_values,
                 )
 
-                fold_rows.append(
-                    {
-                        "model_family": "tree",
-                        "feature_set": feature_set_name,
-                        "feature_count": len(feature_cols),
-                        "model_name": model_name,
-                        "model_display_name": display_name,
-                        "fold": fold,
-                        "best_epoch": np.nan,
-                        "epochs_trained": np.nan,
-                        "best_val_loss": np.nan,
-                        **metrics,
-                    }
-                )
+                row = {
+                    "model_family": "tree",
+                    "feature_set": feature_set_name,
+                    "feature_count": len(feature_cols),
+                    "model_name": model_name,
+                    "model_display_name": display_name,
+                    "fold": fold,
+                    "best_epoch": np.nan,
+                    "epochs_trained": np.nan,
+                    "best_val_loss": np.nan,
+                    **metrics,
+                }
+
+                fold_rows.append(row)
+                append_fold_row(row)
 
                 key = (feature_set_name, model_name)
-                part = pd.DataFrame(
-                    {
-                        "true_class": y_true,
-                        "pred_class": y_pred,
-                    }
-                )
+                part = pd.DataFrame({"true_class": y_true, "pred_class": y_pred})
                 for class_id in class_labels:
                     part[f"proba_{class_id}"] = y_proba[:, class_id]
                 oof_store.setdefault(key, []).append(part)
 
-            for display_name, loss_type in NN_EXPERIMENTS.items():
+                fit_idx += 1
+
+                log(
+                    f"[{fit_idx}/{total_fits}] tree={model_name} "
+                    f"set ' {feature_set_name}' fold={fold}"
+                    f" done in {time.time() - t0:6.1f}s "
+                    f"log_loss={metrics['log_loss']:.4f} "
+                )
+
+            for display_name in selected_nn_experiments:
+                loss_type = NN_EXPERIMENTS[display_name]
                 model_name = NN_MODEL_KEYS[display_name]
+                t0 = time.time()
 
                 result = train_nn_one_fold(
-                    train_part_df=train_df,
-                    val_part_df=val_df,
+                    train_part_df=inner_train_df,
+                    val_part_df=inner_val_df,
                     feature_cols=feature_cols,
                     loss_type=loss_type,
                     xrv_class_values=xrv_class_values,
@@ -246,34 +365,44 @@ def main() -> None:
                     xrv_class_values=xrv_class_values,
                 )
 
-                fold_rows.append(
-                    {
-                        "model_family": "nn",
-                        "feature_set": feature_set_name,
-                        "feature_count": len(feature_cols),
-                        "model_name": model_name,
-                        "model_display_name": display_name,
-                        "fold": fold,
-                        "best_epoch": result["best_epoch"],
-                        "epochs_trained": result["epochs_trained"],
-                        "best_val_loss": result["best_val_loss"],
-                        **metrics,
-                    }
-                )
+                row = {
+                    "model_family": "nn",
+                    "feature_set": feature_set_name,
+                    "feature_count": len(feature_cols),
+                    "model_name": model_name,
+                    "model_display_name": display_name,
+                    "fold": fold,
+                    "best_epoch": result["best_epoch"],
+                    "epochs_trained": result["epochs_trained"],
+                    "best_val_loss": result["best_val_loss"],
+                    **metrics,
+                }
+
+                fold_rows.append(row)
+                append_fold_row(row)
 
                 key = (feature_set_name, model_name)
-                part = pd.DataFrame(
-                    {
-                        "true_class": y_true,
-                        "pred_class": y_pred,
-                    }
-                )
+                part = pd.DataFrame({"true_class": y_true, "pred_class": y_pred})
+
                 for class_id in class_labels:
                     part[f"proba_{class_id}"] = y_proba[:, class_id]
                 oof_store.setdefault(key, []).append(part)
 
+                fit_idx += 1
+
+                log(
+                    f"[{fit_idx}/{total_fits}] nn={model_name} "
+                    f"set='{feature_set_name}' fold={fold} "
+                    f"done in {time.time() - t0:6.1f}s "
+                    f"epochs={result['epochs_trained']} "
+                    f"log_loss={metrics['log_loss']:.4f}"
+                )
+
     fold_df = pd.DataFrame(fold_rows)
-    fold_df.to_csv(OUT_DIR / "cv_fold_metrics.csv", index=False)
+
+    # Final canonical write (overwrites the streamed checkpoint with ordered rows).
+
+    fold_df.to_csv(fold_metrics_path, index=False)
 
     metric_cols = [
         "exact_accuracy",
@@ -328,21 +457,9 @@ def main() -> None:
 
         summary_rows.append(row)
 
-    leaderboard = pd.DataFrame(summary_rows).sort_values(
-        by=[
-            "oof_log_loss",
-            "oof_expected_xrv_mae",
-            "oof_class_step_mae",
-            "oof_balanced_accuracy",
-        ],
-        ascending=[True, True, True, False],
-    ).reset_index(drop=True)
-
-    leaderboard.insert(0, "rank", np.arange(1, len(leaderboard) + 1))
-    leaderboard.to_csv(OUT_DIR / "leaderboard.csv", index=False)
-
-    best_per_model = (
-        leaderboard.sort_values(
+    leaderboard = (
+        pd.DataFrame(summary_rows)
+        .sort_values(
             by=[
                 "oof_log_loss",
                 "oof_expected_xrv_mae",
@@ -351,44 +468,10 @@ def main() -> None:
             ],
             ascending=[True, True, True, False],
         )
-        .groupby("model_display_name", as_index=False, group_keys=False)
-        .head(1)
         .reset_index(drop=True)
     )
-    best_per_model.to_csv(OUT_DIR / "best_per_model.csv", index=False)
-
-    best_row = leaderboard.iloc[0]
-    best_key = (best_row["feature_set"], best_row["model_name"])
-    best_oof = pd.concat(oof_store[best_key], ignore_index=True)
-
-    best_report = build_classification_report(
-        y_true=best_oof["true_class"].to_numpy(dtype=np.int64),
-        y_pred=best_oof["pred_class"].to_numpy(dtype=np.int64),
-        xrv_class_values=xrv_class_values,
-    )
-    best_cm = build_confusion_matrix(
-        y_true=best_oof["true_class"].to_numpy(dtype=np.int64),
-        y_pred=best_oof["pred_class"].to_numpy(dtype=np.int64),
-        xrv_class_values=xrv_class_values,
-    )
-
-    save_classification_report(best_report, OUT_DIR / "best_classification_report.csv")
-    save_confusion_matrix(best_cm, OUT_DIR / "best_confusion_matrix.csv")
-    best_row.to_frame().T.to_csv(OUT_DIR / "best_model_selection.csv", index=False)
-
-    print(
-        leaderboard[
-            [
-                "rank",
-                "model_display_name",
-                "feature_set",
-                "oof_log_loss",
-                "oof_expected_xrv_mae",
-                "oof_balanced_accuracy",
-            ]
-        ].head(10).to_string(index=False)
-    )
-    print(f"\nSaved outputs to: {OUT_DIR}")
+    leaderboard.insert(0, "rank", np.arange(1, len(leaderboard) + 1))
+    leaderboard.to_csv(out_dir / "leaderboard.csv", index=False)
 
 
 if __name__ == "__main__":

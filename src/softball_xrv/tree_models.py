@@ -4,10 +4,9 @@ import numpy as np
 import pandas as pd
 from collections.abc import Sequence
 
-from catboost import CatBoostClassifier
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from xgboost import XGBClassifier
 
 RANDOM_STATE = 42
 EARLY_STOPPING_ROUNDS = 30
@@ -22,6 +21,8 @@ TREE_MODEL_DISPLAY_NAMES = {
 
 def get_tree_models() -> dict[str, object]:
     """Return fresh tree model objects keyed by machine-friendly model names."""
+    from catboost import CatBoostClassifier
+    from xgboost import XGBClassifier
 
     return {
         "random_forest": RandomForestClassifier(
