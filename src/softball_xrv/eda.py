@@ -27,7 +27,9 @@ def load_train_frame(
 
     missing_cols = [col for col in required_cols if col not in df.columns]
     if missing_cols:
-        raise KeyError(f"Missing required Track A columns in training data: {missing_cols}")
+        raise KeyError(
+            f"Missing required Track A columns in training data: {missing_cols}"
+        )
 
     if target_col not in df.columns:
         raise KeyError(f"Missing target column in training data: {target_col}")

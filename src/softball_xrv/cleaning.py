@@ -1,7 +1,7 @@
 """Coerce Track A pitch-tracking features and write raw-data quality reports."""
 
 import pandas as pd
-from softball_xrv.config  import CLEAN_DATA_PATH, RAW_CSV_PATH, REPORTS_DIR
+from softball_xrv.config import CLEAN_DATA_PATH, RAW_CSV_PATH, REPORTS_DIR
 from softball_xrv.schema import TRACK_A_COLS
 
 

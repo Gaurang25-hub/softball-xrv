@@ -1,0 +1,2 @@
+exact_accuracy,balanced_accuracy,log_loss,top_2_accuracy,class_step_mae,expected_xrv_mae,best_val_loss,best_epoch,epochs_trained
+0.5034596375617792,0.14544884011250106,1.4565119001525932,0.6883031301482702,1.2036243822075783,0.14325138762665598,1.5206093788146973,45,57

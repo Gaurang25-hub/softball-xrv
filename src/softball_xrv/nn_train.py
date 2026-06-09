@@ -52,47 +52,78 @@ def preprocess_nn_features(
     train_part_df: pd.DataFrame,
     val_part_df: pd.DataFrame,
     feature_cols: Sequence[str],
-) -> tuple[np.ndarray, np.ndarray]:
+    test_part_df: pd.DataFrame = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
     """
     NN-only preprocessing.
     Fit medians and scaler on inner-train only.
     Apply those same train medians/scaler to validation.
     """
+    X_test_scaled = None
+    if test_part_df is not None:
+        X_train = train_part_df[list(feature_cols)].copy()
+        X_val = val_part_df[list(feature_cols)].copy()
+        X_test = test_part_df[list(feature_cols)].copy()
 
-    X_train = train_part_df[list(feature_cols)].copy()
-    X_val = val_part_df[list(feature_cols)].copy()
+        X_train = X_train.apply(pd.to_numeric, errors="coerce")
+        X_val = X_val.apply(pd.to_numeric, errors="coerce")
+        X_test = X_test.apply(pd.to_numeric, errors="coerce")
 
-    X_train = X_train.apply(pd.to_numeric, errors="coerce")
-    X_val = X_val.apply(pd.to_numeric, errors="coerce")
+        X_train = X_train.replace([np.inf, -np.inf], np.nan)
+        X_val = X_val.replace([np.inf, -np.inf], np.nan)
+        X_test = X_test.replace([np.inf, -np.inf], np.nan)
 
-    X_train = X_train.replace([np.inf, -np.inf], np.nan)
-    X_val = X_val.replace([np.inf, -np.inf], np.nan)
+        train_medians = X_train.median(axis=0).fillna(0.0)
 
-    train_medians = X_train.median(axis=0).fillna(0.0)
+        X_train = X_train.fillna(train_medians)
+        X_val = X_val.fillna(train_medians)
+        X_test = X_test.fillna(train_medians)
 
-    X_train = X_train.fillna(train_medians)
-    X_val = X_val.fillna(train_medians)
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_val_scaled = scaler.transform(X_val)
+        X_test_scaled = scaler.transform(X_test)
 
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_val_scaled = scaler.transform(X_val)
+        X_train_scaled = np.ascontiguousarray(X_train_scaled, dtype=np.float32)
+        X_val_scaled = np.ascontiguousarray(X_val_scaled, dtype=np.float32)
+        X_test_scaled = np.ascontiguousarray(X_test_scaled, dtype=np.float32)
+    else:
+        X_train = train_part_df[list(feature_cols)].copy()
+        X_val = val_part_df[list(feature_cols)].copy()
 
-    X_train_scaled = np.ascontiguousarray(X_train_scaled, dtype=np.float32)
-    X_val_scaled = np.ascontiguousarray(X_val_scaled, dtype=np.float32)
+        X_train = X_train.apply(pd.to_numeric, errors="coerce")
+        X_val = X_val.apply(pd.to_numeric, errors="coerce")
+
+        X_train = X_train.replace([np.inf, -np.inf], np.nan)
+        X_val = X_val.replace([np.inf, -np.inf], np.nan)
+
+        train_medians = X_train.median(axis=0).fillna(0.0)
+
+        X_train = X_train.fillna(train_medians)
+        X_val = X_val.fillna(train_medians)
+
+        scaler = StandardScaler()
+        X_train_scaled = scaler.fit_transform(X_train)
+        X_val_scaled = scaler.transform(X_val)
+
+        X_train_scaled = np.ascontiguousarray(X_train_scaled, dtype=np.float32)
+        X_val_scaled = np.ascontiguousarray(X_val_scaled, dtype=np.float32)
 
     if X_train_scaled.shape[1] != len(feature_cols):
         raise ValueError(
             f"NN preprocessing changed feature count: "
             f"expected {len(feature_cols)}, got {X_train_scaled.shape[1]}"
         )
-
     if not np.isfinite(X_train_scaled).all():
         raise ValueError("X_train_scaled contains NaN or inf after preprocessing.")
 
     if not np.isfinite(X_val_scaled).all():
         raise ValueError("X_val_scaled contains NaN or inf after preprocessing.")
 
-    return X_train_scaled, X_val_scaled
+    if X_test_scaled is not None and not np.isfinite(X_test_scaled).all():
+        raise ValueError("X_test_scaled contains NaN or inf after preprocessing.")
+
+    return X_train_scaled, X_val_scaled, X_test_scaled
 
 
 def compute_nn_loss(
@@ -145,6 +176,7 @@ def train_nn_one_fold(
     feature_cols: Sequence[str],
     loss_type: str,
     xrv_class_values: np.ndarray,
+    test_part_df: pd.DataFrame = None,
     target_col: str = "target_class",
     config: NNTrainConfig | None = None,
     device: torch.device | None = None,
@@ -167,10 +199,16 @@ def train_nn_one_fold(
 
     y_train = train_part_df[target_col].to_numpy(dtype=np.int64)
     y_val = val_part_df[target_col].to_numpy(dtype=np.int64)
+    y_test = (
+        test_part_df[target_col].to_numpy(dtype=np.int64)
+        if test_part_df is not None
+        else None
+    )
 
-    X_train_np, X_val_np = preprocess_nn_features(
+    X_train_np, X_val_np, X_test_np = preprocess_nn_features(
         train_part_df=train_part_df,
         val_part_df=val_part_df,
+        test_part_df=test_part_df,
         feature_cols=feature_cols,
     )
 
@@ -179,6 +217,10 @@ def train_nn_one_fold(
 
     X_val_tensor = torch.from_numpy(X_val_np).to(device)
     y_val_tensor = torch.from_numpy(y_val).to(device)
+
+    X_test_tensor = (
+        torch.from_numpy(X_test_np).to(device) if X_test_np is not None else None
+    )
 
     actual_batch_size = min(config.batch_size, len(X_train_tensor))
 
@@ -305,35 +347,68 @@ def train_nn_one_fold(
         model.load_state_dict(best_state)
         model.to(device)
 
-    model.eval()
-    with torch.no_grad():
-        val_logits = model(X_val_tensor)
+    if test_part_df is not None:
+        model.eval()
+        with torch.no_grad():
+            test_logits = model(X_test_tensor)
+        test_proba = torch.softmax(test_logits, dim=1).double().detach().cpu().numpy()
+
+        if not np.isfinite(test_proba).all():
+            raise ValueError("Test probabilities contain NaN or inf.")
+
+        test_proba = np.clip(test_proba, 1e-15, 1.0)
+        test_proba = test_proba / test_proba.sum(
+            axis=1, keepdims=True
+        )  # renormalize — present
+
+        test_pred = test_proba.argmax(axis=1)
+
+        if verbose:
+            print(
+                f"Best checkpoint | "
+                f"best_epoch={best_epoch} | "
+                f"best_val_loss={best_val_loss:.4f} | "
+                f"epochs_trained={epochs_trained}",
+                flush=True,
+            )
+        return {
+            "y_true": y_test,
+            "y_pred": test_pred,
+            "y_proba": test_proba,
+            "best_val_loss": best_val_loss,
+            "best_epoch": best_epoch,
+            "epochs_trained": epochs_trained,
+        }
+
+    else:
+        model.eval()
+        with torch.no_grad():
+            val_logits = model(X_val_tensor)
         val_proba = torch.softmax(val_logits, dim=1).double().detach().cpu().numpy()
 
-    if not np.isfinite(val_proba).all():
-        raise ValueError("Validation probabilities contain NaN or inf.")
+        if not np.isfinite(val_proba).all():
+            raise ValueError("Validation probabilities contain NaN or inf.")
 
-    val_proba = np.clip(val_proba, 1e-15, 1.0)
-    val_proba = val_proba / val_proba.sum(
-        axis=1, keepdims=True
-    )  # renormalize — present
+        val_proba = np.clip(val_proba, 1e-15, 1.0)
+        val_proba = val_proba / val_proba.sum(
+            axis=1, keepdims=True
+        )  # renormalize — present
 
-    val_pred = val_proba.argmax(axis=1)
+        val_pred = val_proba.argmax(axis=1)
 
-    if verbose:
-        print(
-            f"Best checkpoint | "
-            f"best_epoch={best_epoch} | "
-            f"best_val_loss={best_val_loss:.4f} | "
-            f"epochs_trained={epochs_trained}",
-            flush=True,
-        )
-
-    return {
-        "y_true": y_val,
-        "y_pred": val_pred,
-        "y_proba": val_proba,
-        "best_val_loss": best_val_loss,
-        "best_epoch": best_epoch,
-        "epochs_trained": epochs_trained,
-    }
+        if verbose:
+            print(
+                f"Best checkpoint | "
+                f"best_epoch={best_epoch} | "
+                f"best_val_loss={best_val_loss:.4f} | "
+                f"epochs_trained={epochs_trained}",
+                flush=True,
+            )
+        return {
+            "y_true": y_val,
+            "y_pred": val_pred,
+            "y_proba": val_proba,
+            "best_val_loss": best_val_loss,
+            "best_epoch": best_epoch,
+            "epochs_trained": epochs_trained,
+        }

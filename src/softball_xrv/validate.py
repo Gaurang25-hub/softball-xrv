@@ -3,7 +3,7 @@
 from contextlib import redirect_stdout
 import pandas as pd
 from softball_xrv.schema import TRACK_A_SCHEMA
-from softball_xrv.config  import TRAIN_PATH, TEST_PATH, REPORTS_DIR
+from softball_xrv.config import TRAIN_PATH, TEST_PATH, REPORTS_DIR
 
 
 def validate_dataset(df: pd.DataFrame, dataset_name: str) -> None:
