@@ -75,8 +75,11 @@ softball-xrv/
 └── reports/
     ├── quality/
     ├── validation/
+    ├── evaluation/
     ├── eda/
     └── model_selection/
+    
+    
 ```
 
 
